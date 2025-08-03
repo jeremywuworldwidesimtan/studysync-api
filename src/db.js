@@ -16,4 +16,17 @@ db.serialize(() => {
   `);
 });
 
+// Create notes table
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      user_id INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+  `);
+});
+
 module.exports = db;
