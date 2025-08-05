@@ -111,4 +111,134 @@ router.delete('/note/:id', (req, res) => {
 
 // #endregion
 
+// #region Projects
+
+// GET EVERYTHING from a project
+router.get('/project/:id', (req, res) => {
+    const projectId = req.params.id;
+    const project_json = {};
+    // Get project data
+    db.all('SELECT * FROM projects WHERE id = ? ', [projectId], (err, project) => {
+        if (err) return res.status(500).json({ error: err.message });
+        project_json.project = project[0]
+        // Get all summaries
+        db.all('SELECT * FROM summaries WHERE obsolete = 0 AND project_id = ? ', [project[0].id], (err, summaryRows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            project_json.summaries = summaryRows
+            // Get all quizsets
+            db.all('SELECT * FROM quizsets WHERE project_id = ? ', [project[0].id], (err, quizsetRows) => {
+                if (err) return res.status(500).json({ error: err.message });
+                project_json.quizsets = quizsetRows
+                // For each quizset
+                quizsetRows.forEach(e => {
+                    // Get all quizzes
+                    db.all('SELECT * FROM quizzes WHERE quizset = ? ', [e.id], (err, quizRows) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    e.quizzes = quizRows
+                    // For each quiz
+                    e.quizzes.forEach(eq => {
+                        // Parse options
+                        eq.options = JSON.parse(eq.options);
+                    });
+                });
+                });
+                // Get all flashcards
+                db.all('SELECT * FROM flashcards WHERE project_id = ? ', [project[0].id], (err, flashcardRows) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    project_json.flashcards = flashcardRows
+                    res.json(project_json);
+                });
+            });
+        })
+    });
+});
+
+// #endregion
+
+// #region Summaries
+
+// GET all summaries for a project
+router.get('/summaries/:id', (req, res) => {
+  const projectId = req.params.id;
+  db.all('SELECT chapter, summary FROM summaries WHERE obsolete = 0 AND project_id = ? ', [projectId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// #endregion
+
+// #region Quizsets
+
+// GET all quizsets for a project
+router.get('/quizsets/:id', (req, res) => {
+  const projectId = req.params.id;
+  db.all('SELECT * FROM quizsets WHERE project_id = ? ', [projectId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// GET all quizzes on all quizsets for a project
+router.get('/quizsets/quizzes/:id', (req, res) => {
+  const projectId = req.params.id;
+  const jason = {};
+  // Get all quizsets
+  db.all('SELECT * FROM quizsets WHERE project_id = ? ', [projectId], (err, quizsetRows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      jason.quizsets = quizsetRows
+      // For each quizset
+      quizsetRows.forEach(e => {
+          // Get all quizzes
+          db.all('SELECT * FROM quizzes WHERE quizset = ? ', [e.id], (err, quizRows) => {
+            // console.log(quizRows)
+            if (err) return res.status(500).json({ error: err.message });
+            e.quizzes = quizRows
+            // For each quiz
+            e.quizzes.forEach(eq => {
+                // Parse options
+                eq.options = JSON.parse(eq.options);
+            });
+            
+          });
+        });
+      db.all('', (err) => {
+          res.json(jason);
+        });
+      })
+});
+
+// #endregion
+
+// #region Quizzes
+
+// GET all quizzes for a quizset
+router.get('/quizzes/:id', (req, res) => {
+  const quizsetId = req.params.id;
+  db.all('SELECT * FROM quizzes WHERE quizset = ? ', [quizsetId], (err, quizRows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // For each quiz
+    quizRows.forEach(eq => {
+        // Parse options
+        eq.options = JSON.parse(eq.options);
+    });
+    res.json(quizRows);
+  });
+});
+
+// #endregion
+
+// #region Flashcards
+
+// GET all flashcards for a project
+router.get('/flashcards/:id', (req, res) => {
+  const projectId = req.params.id;
+  db.all('SELECT * FROM flashcards WHERE project_id = ? ', [projectId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// #endregion
+
 module.exports = router;
