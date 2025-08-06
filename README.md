@@ -40,6 +40,7 @@ The Express server mounts:
 - `DELETE /note/:id` – delete a note
 
 #### Projects & Related Data
+- `GET /projects/:id` - return a list of the user's projects
 - `GET /project/:id` – return a project with its summaries, quizsets/quizzes, and flashcards
 
 #### Summaries
@@ -49,6 +50,8 @@ The Express server mounts:
 - `GET /quizsets/:id` – list quizsets for a project
 - `GET /quizsets/quizzes/:id` – list quizsets with nested quizzes for a project
 - `GET /quizzes/:id` – list quizzes in a quizset
+- `POST /attempt` - submit an array of user attempts at quiz questions
+- `GET /stats/:id` - get user results on quizzes overall
 
 #### Flashcards
 - `GET /flashcards/:id` – list flashcards for a project
@@ -137,4 +140,9 @@ The Express server mounts:
 | | `project_id` | INTEGER FK → projects.id | Parent project |
 | | `question` | TEXT | Flashcard question |
 | | `answer` | TEXT | Flashcard answer |
+| **flashcards** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each attempt |
+| | `user_id` | INTEGER FK → users.id | User who attempted a quiz |
+| | `quiz_id` | INTEGER FK → quizzes.id | The quiz being attempted |
+| | `correct` | INTEGER | Flag (0/1). Whether the user is correct in their answering attempt |
+| | `obsolete` | INTEGER | Flag (0/1). When users re-attempt the same questions, older attempts are marked obsolete and not counted towards stats. |
 
