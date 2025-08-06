@@ -140,7 +140,7 @@ The Express server mounts:
 | | `project_id` | INTEGER FK → projects.id | Parent project |
 | | `question` | TEXT | Flashcard question |
 | | `answer` | TEXT | Flashcard answer |
-| **flashcards** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each attempt |
+| **attempts** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each attempt |
 | | `user_id` | INTEGER FK → users.id | User who attempted a quiz |
 | | `quiz_id` | INTEGER FK → quizzes.id | The quiz being attempted |
 | | `correct` | INTEGER | Flag (0/1). Whether the user is correct in their answering attempt |
