@@ -118,19 +118,19 @@ The Express server mounts:
 | | `chapter` | TEXT | Covered chapter or section |
 | | `summary` | TEXT | Summary text |
 | | `obsolete` | INTEGER | Flag (0/1). When new summaries are generated, older ones are marked obsolete and hidden in the UI. |
-| | `project_id` | INTEGER FK → projects.id | Related project |
+| | `project_id` | INTEGER FK → projects.id | Parent project |
 | **quizsets** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each quizset |
 | | `name` | TEXT | Quizset name |
 | | `project_id` | INTEGER FK → projects.id | Parent project |
 | **quizzes** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each quiz question |
-| | `project_id` | INTEGER FK → projects.id | Related project |
+| | `project_id` | INTEGER FK → projects.id | Parent project |
 | | `quizset` | INTEGER FK → quizsets.id | Containing quizset |
 | | `question` | TEXT | Question text |
 | | `options` | TEXT | JSON-encoded answer options |
 | | `answer` | TEXT | Correct answer |
 | | `explanation` | TEXT | Explanation of the answer |
 | **flashcards** | `id` | INTEGER PK AUTOINCREMENT | Unique identifier for each flashcard |
-| | `project_id` | INTEGER FK → projects.id | Related project |
+| | `project_id` | INTEGER FK → projects.id | Parent project |
 | | `question` | TEXT | Flashcard question |
 | | `answer` | TEXT | Flashcard answer |
 
