@@ -3,7 +3,8 @@ const router = express.Router();
 const db = require('./db');
 const fs = require('fs');
 const open_ai = require('openai');
-const openai = new open_ai.OpenAI({apiKey: process.env.OPENAI_API_KEY,});
+const env = require('dotenv');
+const openai = new open_ai.OpenAI({apiKey: env.config().parsed.OPENAI_API_KEY});
 
 async function createFile(filePath) {
   let result;
