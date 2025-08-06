@@ -113,6 +113,15 @@ router.delete('/note/:id', (req, res) => {
 
 // #region Projects
 
+// GET project ID and titles of a user
+router.get('/projects/:id', (req, res) => {
+  const userId = req.params.id;
+  db.all('SELECT id, name FROM projects WHERE user_id = ?', [userId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
 // GET EVERYTHING from a project
 router.get('/project/:id', (req, res) => {
     const projectId = req.params.id;
@@ -223,6 +232,44 @@ router.get('/quizzes/:id', (req, res) => {
         eq.options = JSON.parse(eq.options);
     });
     res.json(quizRows);
+  });
+});
+
+// POST user attempts at quizzes
+router.post('/attempt', (req, res) => {
+  // Format attempts as [{ user_id, quiz_id, correct }]
+  const { attempts } = req.body;
+
+  
+  attempts.forEach(attempt => {
+    const { userId, quizId, correct } = attempt;
+    // Update old entries to obsolete them
+    db.run(
+      "UPDATE attempts SET obsolete = 1 WHERE user_id = ? AND quiz_id = ? AND obsolete = 0",
+      [userId, quizId],
+      async function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        db.run('INSERT INTO attempts (user_id, quiz_id, correct, obsolete) VALUES (?, ?, ?, ?)', [userId, quizId, correct, 0], (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+        });
+      })
+  })
+
+  db.all('', (err) => {
+    res.json({ message: 'Attempt saved successfully' });
+  })
+});
+
+// GET user quiz stats
+router.get('/stats/:id', (req, res) => {
+  const userId = req.params.id;
+  // Get the percentage of correct attempts
+  db.get('SELECT COUNT(*) AS total_attempts, SUM(correct) AS correct_attempts FROM attempts WHERE user_id = ? AND obsolete = 0', [userId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const totalAttempts = row.total_attempts;
+    const correctAttempts = row.correct_attempts;
+    const percentage = (correctAttempts / totalAttempts) * 100;
+    res.json({ totalAttempts, correctAttempts, percentage });
   });
 });
 

@@ -85,6 +85,21 @@ db.serialize(() => {
   `);
 });
 
+// Create quiz attempt table
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      quiz_id INTEGER NOT NULL,
+      correct INTEGER NOT NULL,
+      obsolete INTEGER NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users (id),
+      FOREIGN KEY (quiz_id) REFERENCES quizzes (id)
+    )
+  `);
+});
+
 // Create flashcards table {id: int, project_id: int, chapter: string, question: string, answer: string}
 db.serialize(() => {
   db.run(`
