@@ -121,30 +121,30 @@ router.post("/new", async (req, res) => {
   }
 });
 
-// router.post("/upload", async (req, res) => {
-//   const { filePath, project_id } = req.body;
-//   if (!filePath) {
-//     return res.status(400).json({ error: "File path is required" });
-//   }
-//   const fileId = await createFile(filePath);
-//   const vector_store_id = await db.get(
-//     `SELECT vector_store_id FROM projects WHERE id = ?`,
-//     [project_id]
-//   );
+router.post("/upload", async (req, res) => {
+  const { filePath, project_id } = req.body;
+  if (!filePath) {
+    return res.status(400).json({ error: "File path is required" });
+  }
+  const fileId = await createFile(filePath);
+  const vector_store_id = await db.get(
+    `SELECT vector_store_id FROM projects WHERE id = ?`,
+    [project_id]
+  );
 
-//   await openai.vectorStores.files.create(vector_store_id, {
-//     file_id: fileId,
-//   });
-//   // console.log(fileId)
+  await openai.vectorStores.files.create(vector_store_id, {
+    file_id: fileId,
+  });
+  // console.log(fileId)
 
-//   // const result = await openai.vectorStores.files.list(vector_store_id.id);
-//   // console.log(result);
-//   res.json({
-//     vector_store_id: vector_store_id,
-//     project_id: project_id,
-//     status: "success",
-//   });
-// });
+  // const result = await openai.vectorStores.files.list(vector_store_id.id);
+  // console.log(result);
+  res.json({
+    vector_store_id: vector_store_id,
+    project_id: project_id,
+    status: "success",
+  });
+});
 
 // POST generate summary
 router.post("/generateSummary", async (req, res) => {
