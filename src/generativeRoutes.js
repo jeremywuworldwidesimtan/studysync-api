@@ -1,10 +1,32 @@
-const express = require('express');
+const express = require("express");
+const multer = require("multer");
+const path = require("path");
 const router = express.Router();
-const db = require('./db');
-const fs = require('fs');
-const open_ai = require('openai');
-const env = require('dotenv');
-const openai = new open_ai.OpenAI({apiKey: env.config().parsed.OPENAI_API_KEY});
+const db = require("./db");
+const fs = require("fs");
+const open_ai = require("openai");
+const env = require("dotenv");
+const openai = new open_ai.OpenAI({
+  apiKey: env.config().parsed.OPENAI_API_KEY,
+});
+
+const UPLOAD_DIR = "Documents/uploaded_files";
+
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+// Multer setup with temp file storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage });
 
 async function createFile(filePath) {
   let result;
@@ -27,186 +49,262 @@ async function createFile(filePath) {
       purpose: "assistants",
     });
   }
-  console.log(result)
+  // console.log(result);
   return result.id;
 }
 
+router.post("/upload", upload.array("files"), async (req, res) => {
+  const uploadedFiles = req.files; // Multer gives us all uploaded files
+  const relativePaths = req.body.relativePaths; // Comes from FormData
+
+  // Ensure we always work with arrays
+  const relativePathList = Array.isArray(relativePaths)
+    ? relativePaths
+    : [relativePaths];
+
+  try {
+    const savedPaths = [];
+
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const tempPath = file.path;
+      const relativePath = relativePathList[i] || file.originalname;
+      const finalPath = path.join(UPLOAD_DIR, relativePath);
+
+      // Make sure the target folder exists
+      const finalDir = path.dirname(finalPath);
+      if (!fs.existsSync(finalDir)) {
+        fs.mkdirSync(finalDir, { recursive: true });
+      }
+
+      // Move the file to its correct folder
+      fs.renameSync(tempPath, finalPath);
+      savedPaths.push(finalPath);
+    }
+
+    res.json({ savedPaths });
+  } catch (err) {
+    console.error("Error during file move:", err);
+    res.status(500).json({ error: "One or more files failed to move." });
+  }
+});
 
 // TODO move
-router.post('/new', async (req, res) => {
+router.post("/new", async (req, res) => {
   const { filePath, project_name } = req.body;
-  if (!filePath) {
-    return res.status(400).json({ error: 'File path is required' });
-  }
-  const fileId = await createFile(filePath);
 
-  const vectorStore = await openai.vectorStores.create({
+  try {
+    const vectorStore = await openai.vectorStores.create({
       name: "knowledge_base",
-  });
+    });
 
-  await openai.vectorStores.files.create(
-    vectorStore.id,
-    {
+    // add file to vector store
+    if (filePath) {
+      const fileId = await createFile(filePath);
+
+      await openai.vectorStores.files.create(vectorStore.id, {
         file_id: fileId,
+      });
     }
-  );
-  // console.log(fileId)
 
-  // const result = await openai.vectorStores.files.list(vectorStore.id);
-  // console.log(result);
-
-  db.run('INSERT INTO projects (name, user_id, vector_store_id) VALUES (?, ?, ?)', [project_name || "New Project", 1, vectorStore.id], async function (err) {
-    if (err) return res.status(400).json({ error: err.message });
-    const project = await db.get('SELECT * FROM projects WHERE id = ?', [this.lastID]);
-    res.json({ project: project, status: "success" });
-  })
-});
-
-router.post('/upload', async (req, res) => {
-  const { filePath, project_id } = req.body;
-  if (!filePath) {
-    return res.status(400).json({ error: 'File path is required' });
+    db.run(
+      "INSERT INTO projects (name, user_id, vector_store_id) VALUES (?, ?, ?)",
+      [project_name || "New Project", 1, vectorStore.id],
+      async function (err) {
+        if (err) return res.status(400).json({ error: err.message });
+        res.json({ project_id: this.lastID });
+      }
+    );
+  } catch (err) {
+    console.error("❌ Error in /new:", err);
+    res.status(500).json({ error: "Failed to create project" });
   }
-  const fileId = await createFile(filePath);
-  const vector_store_id = await db.get(`SELECT vector_store_id FROM projects WHERE id = ?`, [project_id]);
-
-  await openai.vectorStores.files.create(
-    vector_store_id,
-    {
-        file_id: fileId,
-    }
-  );
-  // console.log(fileId)
-
-  // const result = await openai.vectorStores.files.list(vector_store_id.id);
-  // console.log(result);
-  res.json({ vector_store_id: vector_store_id, project_id: project_id, status: "success" });
 });
+
+// router.post("/upload", async (req, res) => {
+//   const { filePath, project_id } = req.body;
+//   if (!filePath) {
+//     return res.status(400).json({ error: "File path is required" });
+//   }
+//   const fileId = await createFile(filePath);
+//   const vector_store_id = await db.get(
+//     `SELECT vector_store_id FROM projects WHERE id = ?`,
+//     [project_id]
+//   );
+
+//   await openai.vectorStores.files.create(vector_store_id, {
+//     file_id: fileId,
+//   });
+//   // console.log(fileId)
+
+//   // const result = await openai.vectorStores.files.list(vector_store_id.id);
+//   // console.log(result);
+//   res.json({
+//     vector_store_id: vector_store_id,
+//     project_id: project_id,
+//     status: "success",
+//   });
+// });
 
 // POST generate summary
-router.post('/generateSummary', async (req, res) => {
+router.post("/generateSummary", async (req, res) => {
   const { project_id, vector_store_id } = req.body;
   if (!project_id) {
-    return res.status(400).json({ error: 'Project id is required' });
+    return res.status(400).json({ error: "Project id is required" });
   }
-  
-  db.all('SELECT vector_store_id FROM projects WHERE id = ?', [project_id], function (err, rows) {
-    if (err) return res.status(400).json({ error: err.message });
 
-    // Update old entries to obsolete them
-    db.run('UPDATE summaries SET obsolete = 1 WHERE project_id = ?', [project_id], async function (err) {
+  db.all(
+    "SELECT vector_store_id FROM projects WHERE id = ?",
+    [project_id],
+    function (err, rows) {
       if (err) return res.status(400).json({ error: err.message });
-      
-      // Generate new entries
-      const response = await openai.responses.create({
-        model: "gpt-4.1-mini-2025-04-14",
-        prompt: {
-      "id": "pmpt_6890d15a96ac81959f54473946c1bab50fd91f879e70eead",
-      "version": "2"
-    },
-      input: "Create a summary of the documents in the vector store.",
-      tools: [
-          {
-              type: "file_search",
-              vector_store_ids: [vector_store_id || rows[0].vector_store_id],
+
+      // Update old entries to obsolete them
+      db.run(
+        "UPDATE summaries SET obsolete = 1 WHERE project_id = ?",
+        [project_id],
+        async function (err) {
+          if (err) return res.status(400).json({ error: err.message });
+
+          // Generate new entries
+          const response = await openai.responses.create({
+            model: "gpt-4.1-mini-2025-04-14",
+            prompt: {
+              id: "pmpt_6890d15a96ac81959f54473946c1bab50fd91f879e70eead",
+              version: "2",
             },
-          ],
-    });
-    // console.log(response);
-    const response_output = JSON.parse(response.output_text)
-    const response_content = response_output.content
-    
-    // Store them into db
-    response_content.forEach(content => {
-      const chapter = content.chapter;
-      const summary = content.summary;
-      
-      db.run('INSERT INTO summaries (chapter, summary, obsolete, project_id) VALUES (?, ?, ?, ?)',
-          [chapter, summary, 0, project_id],
-          function (err) {
-            if (err) return res.status(400).json({ error: err.message });
+            input: "Create a summary of the documents in the vector store.",
+            tools: [
+              {
+                type: "file_search",
+                vector_store_ids: [vector_store_id || rows[0].vector_store_id],
+              },
+            ],
           });
-        });
-        res.json(response_output);
-    });
-  });
+          // console.log(response);
+          const response_output = JSON.parse(response.output_text);
+          const response_content = response_output.content;
+
+          // Store them into db
+          response_content.forEach((content) => {
+            const chapter = content.chapter;
+            const summary = content.summary;
+
+            db.run(
+              "INSERT INTO summaries (chapter, summary, obsolete, project_id) VALUES (?, ?, ?, ?)",
+              [chapter, summary, 0, project_id],
+              function (err) {
+                if (err) return res.status(400).json({ error: err.message });
+              }
+            );
+          });
+          res.json(response_output);
+        }
+      );
+    }
+  );
 });
 
 // POST generate quizzes
-router.post('/generateQuizzes', async (req, res) => {
+router.post("/generateQuizzes", async (req, res) => {
   const { quizset_name, project_id, vector_store_id, emphasis } = req.body;
   if (!project_id) {
-    return res.status(400).json({ error: 'Project id is required' });
+    return res.status(400).json({ error: "Project id is required" });
   }
 
-  db.all('SELECT vector_store_id FROM projects WHERE id = ?', [project_id], function (err, rows) {
-    if (err) return res.status(400).json({ error: err.message });
-    // console.log(rows[0].vector_store_id)
-    
-    // Create a new quizset
-    db.run('INSERT INTO quizsets (name, project_id) VALUES (?, ?)', [quizset_name || "New Quizset", project_id], async function (err) {
+  db.all(
+    "SELECT vector_store_id FROM projects WHERE id = ?",
+    [project_id],
+    function (err, rows) {
       if (err) return res.status(400).json({ error: err.message });
-      const quizset_id = this.lastID;
-      
-      const input_prompt = emphasis ? "Create quiz questions based on documents in the vector store with an emphasis on " + emphasis + "." : "Create quiz questions based on documents in the vector store."
-      // console.log(input_prompt);
-      
-      // Generate new quizzes
-      const response = await openai.responses.create({
-        model: "gpt-4.1-mini-2025-04-14",
-        prompt: {
-          "id": "pmpt_6890db2b6f3c8194888c38dd2fecb1dd034d52569d0c8ef7",
-          "version": "2"
-        },
-        input: input_prompt,
-        tools: [
-          {
-            type: "file_search",
-            vector_store_ids: [vector_store_id || rows[0].vector_store_id],
-          },
-        ],
-      });
-      // console.log(response);
-      const response_output = JSON.parse(response.output_text)
-      const response_content = response_output.questions
-      
-      // Store them into db
-      response_content.forEach(content => {
-        const question = content.question;
-        const options = content.options;
-        const answer = content.answer;
-        const explanation = content.explanation;
-        
-        db.run('INSERT INTO quizzes (project_id, quizset, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?)',
-          [project_id, quizset_id, question, JSON.stringify(options), answer, explanation],
-          function (err) {
-            if (err) return res.status(400).json({ error: err.message });
+      // console.log(rows[0].vector_store_id)
+
+      // Create a new quizset
+      db.run(
+        "INSERT INTO quizsets (name, project_id) VALUES (?, ?)",
+        [quizset_name || "New Quizset", project_id],
+        async function (err) {
+          if (err) return res.status(400).json({ error: err.message });
+          const quizset_id = this.lastID;
+
+          const input_prompt = emphasis
+            ? "Create quiz questions based on documents in the vector store with an emphasis on " +
+              emphasis +
+              "."
+            : "Create quiz questions based on documents in the vector store.";
+          // console.log(input_prompt);
+
+          // Generate new quizzes
+          const response = await openai.responses.create({
+            model: "gpt-4.1-mini-2025-04-14",
+            prompt: {
+              id: "pmpt_6890db2b6f3c8194888c38dd2fecb1dd034d52569d0c8ef7",
+              version: "2",
+            },
+            input: input_prompt,
+            tools: [
+              {
+                type: "file_search",
+                vector_store_ids: [vector_store_id || rows[0].vector_store_id],
+              },
+            ],
           });
-        });
-        
-        res.json(response_output);
-      });
-    });
+          // console.log(response);
+          const response_output = JSON.parse(response.output_text);
+          const response_content = response_output.questions;
+
+          // Store them into db
+          response_content.forEach((content) => {
+            const question = content.question;
+            const options = content.options;
+            const answer = content.answer;
+            const explanation = content.explanation;
+
+            db.run(
+              "INSERT INTO quizzes (project_id, quizset, question, options, answer, explanation) VALUES (?, ?, ?, ?, ?, ?)",
+              [
+                project_id,
+                quizset_id,
+                question,
+                JSON.stringify(options),
+                answer,
+                explanation,
+              ],
+              function (err) {
+                if (err) return res.status(400).json({ error: err.message });
+              }
+            );
+          });
+
+          res.json(response_output);
+        }
+      );
+    }
+  );
 });
 
 // POST generate flashcards
-router.post('/generateFlashcards', async (req, res) => {
+router.post("/generateFlashcards", async (req, res) => {
   const { project_id, vector_store_id } = req.body;
   if (!project_id) {
-    return res.status(400).json({ error: 'Project id is required' });
+    return res.status(400).json({ error: "Project id is required" });
   }
-  db.all('SELECT vector_store_id FROM projects WHERE id = ?', [project_id], async function (err, rows) {
-    if (err) return res.status(400).json({ error: err.message });
-    // console.log(rows[0].vector_store_id)
-      
+  db.all(
+    "SELECT vector_store_id FROM projects WHERE id = ?",
+    [project_id],
+    async function (err, rows) {
+      if (err) return res.status(400).json({ error: err.message });
+      // console.log(rows[0].vector_store_id)
+
       // Generate new flashcards
       const response = await openai.responses.create({
         model: "gpt-4.1-mini-2025-04-14",
         prompt: {
-          "id": "pmpt_6890dc3a8f18819495b0f1607dd63e7d0467ec484d5547c5",
-          "version": "1"
+          id: "pmpt_6890dc3a8f18819495b0f1607dd63e7d0467ec484d5547c5",
+          version: "1",
         },
-        input: "Create a set of flashcards based on documents in the vector store.",
+        input:
+          "Create a set of flashcards based on documents in the vector store.",
         tools: [
           {
             type: "file_search",
@@ -215,23 +313,26 @@ router.post('/generateFlashcards', async (req, res) => {
         ],
       });
       // console.log(response);
-      const response_output = JSON.parse(response.output_text)
-      const response_content = response_output.items
-      
+      const response_output = JSON.parse(response.output_text);
+      const response_content = response_output.items;
+
       // Store them into db
-      response_content.forEach(content => {
+      response_content.forEach((content) => {
         const question = content.question;
         const answer = content.answer;
-        
-        db.run('INSERT INTO flashcards (project_id, question, answer) VALUES (?, ?, ?)',
+
+        db.run(
+          "INSERT INTO flashcards (project_id, question, answer) VALUES (?, ?, ?)",
           [project_id, question, answer],
           function (err) {
             if (err) return res.status(400).json({ error: err.message });
-          });
-        });
-        
-        res.json(response_output);
+          }
+        );
       });
-    });
-    
+
+      res.json(response_output);
+    }
+  );
+});
+
 module.exports = router;

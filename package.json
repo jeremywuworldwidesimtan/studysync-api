@@ -20,9 +20,11 @@
   "homepage": "https://github.com/jeremywuworldwidesimtan/studysync-api#readme",
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "openai": "^5.11.0",
+    "multer": "^2.0.2",
+    "openai": "^5.12.0",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
