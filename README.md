@@ -58,7 +58,7 @@ The Express server mounts:
 
 ## API Output Schema
 ### Summaries
-```json
+```
 {
     "content": [
         {
@@ -71,7 +71,7 @@ The Express server mounts:
 ```
 
 ### Questions
-```json
+```
 {
     "questions": [
         {
@@ -86,7 +86,7 @@ The Express server mounts:
 ```
 
 ### Flashcards
-```json
+```
 {
     "items": [
         {
