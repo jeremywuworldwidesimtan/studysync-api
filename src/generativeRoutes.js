@@ -26,12 +26,14 @@ async function createFile(filePath) {
       purpose: "assistants",
     });
   }
-  // console.log(result)
+  console.log(result)
   return result.id;
 }
 
-router.post('/upload_new', async (req, res) => {
-  const { filePath } = req.body;
+
+// TODO move
+router.post('/new', async (req, res) => {
+  const { filePath, project_name } = req.body;
   if (!filePath) {
     return res.status(400).json({ error: 'File path is required' });
   }
@@ -49,31 +51,35 @@ router.post('/upload_new', async (req, res) => {
   );
   // console.log(fileId)
 
-  const result = await openai.vectorStores.files.list(vectorStore.id);
+  // const result = await openai.vectorStores.files.list(vectorStore.id);
   // console.log(result);
 
-  res.json({ vector_store_id: vectorStore.id });
+  db.run('INSERT INTO projects (name, user_id, vector_store_id) VALUES (?, ?, ?)', [project_name || "New Project", 1, vectorStore.id], async function (err) {
+    if (err) return res.status(400).json({ error: err.message });
+    const project = await db.get('SELECT * FROM projects WHERE id = ?', [this.lastID]);
+    res.json({ project: project, status: "success" });
+  })
 });
 
 router.post('/upload', async (req, res) => {
-  const { filePath, vector_store_id } = req.body;
+  const { filePath, project_id } = req.body;
   if (!filePath) {
     return res.status(400).json({ error: 'File path is required' });
   }
   const fileId = await createFile(filePath);
+  const vector_store_id = await db.get(`SELECT vector_store_id FROM projects WHERE id = ?`, [project_id]);
 
   await openai.vectorStores.files.create(
-    vector_store_id.id,
+    vector_store_id,
     {
         file_id: fileId,
     }
   );
   // console.log(fileId)
 
-  const result = await openai.vectorStores.files.list(vector_store_id.id);
+  // const result = await openai.vectorStores.files.list(vector_store_id.id);
   // console.log(result);
-
-  res.json({ vector_store_id: vector_store_id.id });
+  res.json({ vector_store_id: vector_store_id, project_id: project_id, status: "success" });
 });
 
 // POST generate summary
@@ -82,46 +88,47 @@ router.post('/generateSummary', async (req, res) => {
   if (!project_id) {
     return res.status(400).json({ error: 'Project id is required' });
   }
-  if (!vector_store_id) {
-    return res.status(400).json({ error: 'Vector store id is required' });
-  }
-
-  // Update old entries to obsolete them
-  db.run('UPDATE summaries SET obsolete = 1 WHERE project_id = ?', [project_id], function (err) {
+  
+  db.all('SELECT vector_store_id FROM projects WHERE id = ?', [project_id], function (err, rows) {
     if (err) return res.status(400).json({ error: err.message });
-  });
 
-  // Generate new entries
-  const response = await openai.responses.create({
-    model: "gpt-4.1",
-    prompt: {
-    "id": "pmpt_6890d15a96ac81959f54473946c1bab50fd91f879e70eead",
-    "version": "2"
+    // Update old entries to obsolete them
+    db.run('UPDATE summaries SET obsolete = 1 WHERE project_id = ?', [project_id], async function (err) {
+      if (err) return res.status(400).json({ error: err.message });
+      
+      // Generate new entries
+      const response = await openai.responses.create({
+        model: "gpt-4.1-mini-2025-04-14",
+        prompt: {
+      "id": "pmpt_6890d15a96ac81959f54473946c1bab50fd91f879e70eead",
+      "version": "2"
     },
-    input: "Create a summary of the documents in the vector store.",
-    tools: [
-        {
-            type: "file_search",
-            vector_store_ids: [vector_store_id],
-        },
-    ],
-  });
-  // console.log(response);
-  const response_output = JSON.parse(response.output_text)
-  const response_content = response_output.content
-
-  // Store them into db
-  response_content.forEach(content => {
-    const chapter = content.chapter;
-    const summary = content.summary;
-
-    db.run('INSERT INTO summaries (chapter, summary, obsolete, project_id, vector_store_id) VALUES (?, ?, ?, ?, ?)',
-        [chapter, summary, 0, project_id, vector_store_id],
-        function (err) {
-        if (err) return res.status(400).json({ error: err.message });
-      });
+      input: "Create a summary of the documents in the vector store.",
+      tools: [
+          {
+              type: "file_search",
+              vector_store_ids: [vector_store_id || rows[0].vector_store_id],
+            },
+          ],
     });
-  res.json(response_output);
+    // console.log(response);
+    const response_output = JSON.parse(response.output_text)
+    const response_content = response_output.content
+    
+    // Store them into db
+    response_content.forEach(content => {
+      const chapter = content.chapter;
+      const summary = content.summary;
+      
+      db.run('INSERT INTO summaries (chapter, summary, obsolete, project_id) VALUES (?, ?, ?, ?)',
+          [chapter, summary, 0, project_id],
+          function (err) {
+            if (err) return res.status(400).json({ error: err.message });
+          });
+        });
+        res.json(response_output);
+    });
+  });
 });
 
 // POST generate quizzes
@@ -130,6 +137,7 @@ router.post('/generateQuizzes', async (req, res) => {
   if (!project_id) {
     return res.status(400).json({ error: 'Project id is required' });
   }
+
   db.all('SELECT vector_store_id FROM projects WHERE id = ?', [project_id], function (err, rows) {
     if (err) return res.status(400).json({ error: err.message });
     // console.log(rows[0].vector_store_id)

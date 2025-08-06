@@ -56,6 +56,48 @@ The Express server mounts:
 - `POST /generateQuizzes` – generate quiz questions, create a quizset, and store quizzes
 - `POST /generateFlashcards` – generate flashcards for a project
 
+## API Output Schema
+### Summaries
+```json
+{
+    "content": [
+        {
+            "chapter": string,
+            "summary": string
+        },
+        ...
+    ]
+}
+```
+
+### Questions
+```json
+{
+    "questions": [
+        {
+            "question": string,
+            "options": string[],
+            "answer": string,
+            "explanation": string
+        },
+        ...
+    ]
+}
+```
+
+### Flashcards
+```json
+{
+    "items": [
+        {
+            "question": string,
+            "answer": string
+        },
+        ...
+    ]
+}
+```
+
 ## Database Schema
 
 | Table | Column | Type | Description |
