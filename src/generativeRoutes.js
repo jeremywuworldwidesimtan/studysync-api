@@ -57,8 +57,8 @@ router.post('/new', async (req, res) => {
 
   db.run('INSERT INTO projects (name, user_id, vector_store_id) VALUES (?, ?, ?)', [project_name || "New Project", 1, vectorStore.id], async function (err) {
     if (err) return res.status(400).json({ error: err.message });
-    const project = await db.get('SELECT * FROM projects WHERE id = ?', [this.lastID]);
-    res.json({ project: project, status: "success" });
+    // const project = await db.get('SELECT * FROM projects WHERE id = ?', [this.lastID]);
+    res.json({ project_id: this.lastID });
   })
 });
 
