@@ -10,7 +10,7 @@ app.use('/api', routes);
 app.use('/api/generative', generative);
 app.use('/api/test', test);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3420;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

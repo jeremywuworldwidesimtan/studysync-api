@@ -2,11 +2,16 @@
 
 API for StudySync AI project.
 
-This repo's contents is intended to be used alongside an accompanying UI (coming soon).
+This repo's contents is intended to be used alongside an [accompanying UI](https://github.com/lawqinx/study-sync-ui).
 
 ## Setup
+You need to have Node.js installed on your machine before running the API
 
-You need to supply your own OpenAI API key to use the AI features. Put your OpenAI API key in a `.env` file:
+1. Clone this repository using `git clone https://github.com/jeremywuworldwidesimtan/studysync-api`
+2. Run `npm install` to install all the Node modules
+3. Use `npm run dev` to run the API with Nodemon, or `npm run start` to run without Nodemon
+4. The API is hosted at [port 3420](http://localhost:3420/) by default, you can change the port number by adding `PORT=your_port_number` to the `.env` file
+5. You need to supply your own OpenAI API key to use the AI features. Put your OpenAI API key in the `.env` file:
 
 ```env
 OPENAI_API_KEY=your_api_key
@@ -18,7 +23,6 @@ The Express server mounts:
 
 - Core routes at `/api`
 - Generative AI routes at `/api/generative`
-- A `/api/test` router is referenced but not implemented and will be removed.
 
 ### Core API Endpoints (`/api`)
 
