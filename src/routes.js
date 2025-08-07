@@ -125,6 +125,7 @@ router.get('/projects/:id', (req, res) => {
 // GET EVERYTHING from a project
 router.get('/project/:id', (req, res) => {
     const projectId = req.params.id;
+    // console.log(projectId)
     const project_json = {};
     // Get project data
     db.all('SELECT * FROM projects WHERE id = ? ', [projectId], (err, project) => {
