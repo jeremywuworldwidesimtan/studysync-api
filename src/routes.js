@@ -125,7 +125,7 @@ router.get('/projects/:id', (req, res) => {
 // GET EVERYTHING from a project
 router.get('/project/:id', (req, res) => {
     const projectId = req.params.id;
-    // console.log(projectId)
+    console.log(projectId)
     const project_json = {};
     // Get project data
     db.all('SELECT * FROM projects WHERE id = ? ', [projectId], (err, project) => {
@@ -233,6 +233,23 @@ router.get('/quizzes/:id', (req, res) => {
         eq.options = JSON.parse(eq.options);
     });
     res.json(quizRows);
+  });
+});
+
+// GET the latest quizset for a project
+router.get('/quizsets/latest/:id', (req, res) => {
+  const projectId = req.params.id;
+  db.get('SELECT * FROM quizsets WHERE project_id = ? ORDER BY id DESC LIMIT 1', [projectId], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    db.all('SELECT * FROM quizzes WHERE quizset = ? ', [rows.id], (err, quizRows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // For each quiz
+    quizRows.forEach(eq => {
+        // Parse options
+        eq.options = JSON.parse(eq.options);
+    });
+    res.json(quizRows);
+    });
   });
 });
 

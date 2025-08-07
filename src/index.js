@@ -4,7 +4,7 @@ const app = express();
 const env = require("dotenv");
 const routes = require("./routes");
 const generative = require("./generativeRoutes");
-//const test = require("./testRoutes");
+const test = require("./testRoutes");
 app.use(
   cors({
     origin: "http://localhost:3000",
